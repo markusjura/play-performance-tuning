@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Play Performance Tuning</title>
+
+    <meta name="description" content="In this talk we'll learn how a Play application manages work behind the scene. Based on this knowledge Markus will show how to identify and solve performance bottlenecks in your system based on certain techniques. For our use case we'll tune a Play application but these patterns can also be applied for any other Akka or Scala driven application.">
+    <meta name="author" content="Markus Jura">
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <link rel="stylesheet" href="css/reveal.css">
+    <link rel="stylesheet" href="css/theme/custom.css" id="theme">
+    <link rel="stylesheet" href="lib/css/idea.css">
+
+    <!-- Printing and PDF exports -->
+    <script>
+      var link = document.createElement( 'link' );
+      link.rel = 'stylesheet';
+      link.type = 'text/css';
+      link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+      document.getElementsByTagName( 'head' )[0].appendChild( link );
+    </script>
+
+    <!--[if lt IE 9]>
+    <script src="lib/js/html5shiv.js"></script>
+    <![endif]-->
+</head>
+
+<body>
+
+<div class="reveal">
+
+<div class="slides">
+
+<!-- ########################################################################################### -->
+<!-- BEGIN
+<!-- ########################################################################################### -->
+
+<section data-markdown data-background="#103a51"><script type="text/template">
+## Play Performance Tuning
+
+### Markus Jura
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section>
+<h2>About me</h2>
+
+<ul>
+    <li>Trainer <a href="http://typesafe.com">@Typesafe</a></li>
+    <li>Living in Hamburg</li>
+    <li>Co-Founder of <a href="https://testmunk.com">testmunk</a></li>
+    <li>4 years Scala, 10 years Java background</li>
+</ul>    
+<div>
+    <a href="https://twitter.com/markusjura" class="twitter-follow-button" data-show-count="true">Follow @markusjura</a>
+    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+    <iframe src="http://ghbtns.com/github-btn.html?user=markusjura&type=follow&count=false"
+    allowtransparency="true" frameborder="0" scrolling="0" width="165" height="20"></iframe>
+</div>  
+</section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## What is faster?
+
+``` scala
+def sync = Action {
+  Ok("Synchronous call")
+}
+```
+
+or
+
+``` scala
+def async = Action.async {
+  Future(Ok("Synchronous call"))
+}
+```
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## What is a fast Application?
+
+<blockquote>An application is fast if it utilizes the resources it runs on efficiently.</blockquote>
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Web Framework Landscape
+
+![Web Framework Architectures](images/web-framework-architectures.png "Web Framework Architectures")
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Servlets (J2EE)
+
+![Thread per Request](images/thread-per-request.png "Thread per Request")
+
+- Thread per Request Model
+  - One thread per HTTP request
+  - Thread is bound to request for requests lifetime
+  - Parallelisim factor = Number of threads
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Servlets (J2EE)
+
+- Good
+  - HTTP requests using internal resources, e.g. CPU intensive tasks
+- Bad
+  - If request is open, thread can not perform other work, e.g.
+    - Calling HTTP Requests
+    - Blocking DB queries
+  - Can not use Comect, SSE, Websocket
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## NodeJS
+
+![Node JS Event Loop](images/nodejs-event-loop.png "Node JS Event Loop")
+
+- Single-threaded event loop
+- Tasks executed asynchronously
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## NodeJS
+
+- Good
+  - Simple model
+  - Fast for pure asynchronous tasks
+- Bad
+  - Blocking operations block the single event loop
+  - Utilizes only one CPU core
+  - Loosing all HTTP requests in event loop if exception is not handled
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Play
+
+![Play Async Handling](images/play-async-handling.png "Play Async Handling")
+
+- Asynchronous HTTP requests
+- Non blocking by default
+- Multi-threaded
+- Thread work stealing
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Play
+
+- Good
+  - Parallelism by using multiple threads
+  - No idle threads
+  - Utilizing all CPU cores  
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Play Performance
+
+[Play Performance](http://playframework.github.io/prune/)
+on
+[Intel Xeon E5-2430L v2 2.4GHz](http://ark.intel.com/products/75785/Intel-Xeon-Processor-E5-2430-v2-15M-Cache-2_50-GHz)
+
+![Play Prune Server](images/play-prune.png "Play Prune Server")
+
+[Play Prune](https://github.com/playframework/prune)
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown data-background="#103a51"><script type="text/template">
+## Play Performance Tuning
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## General System Tuning
+
+1. Write down performance requirements (e.g. Latency, Troughput)
+2. Use JVM tools to identify bottlenecks
+  - Use Linux! OSX is unreliable because it gives priority to user process
+  - [Disable C-States](https://access.redhat.com/articles/65410)
+  - [Disable Turbo Boost](http://www.brendangregg.com/blog/2014-09-15/the-msrs-of-ec2.html)
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## JVM Tools
+- Profiling
+  - [Java Mission Control](http://hirt.se/blog/?p=343)
+  - [YourKit](https://www.yourkit.com/)
+- Monitoring  
+  - [Java Mission Control](http://hirt.se/blog/?p=343)
+  - [JVMTop](https://code.google.com/p/jvmtop/)   
+- Memory Leaks
+  - [JMap](http://docs.oracle.com/javase/7/docs/technotes/tools/share/jmap.html)
+  - [Censum](http://www.jclarity.com/censum/)  
+- GC Overhead
+  - [Jitwatch](https://github.com/AdoptOpenJDK/jitwatch/wiki)
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Typical Bottlenecks
+
+1. Blocking Calls
+2. JVM Configuration
+3. JSON Serialization
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown data-background="#103a51"><script type="text/template">
+## Tuning Thread Pools
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Thread Pools in Play
+
+- Netty &#8594; Handles Netty I/O (internal use only)
+- Play default &#8594; Akka dispatcher, optimized for asynchronous operations
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Default Thread Pool Configuration
+
+```no-highlight
+akka {
+  fork-join-executor {
+    # The parallelism factor is used to determine thread pool 
+    # size using the following formula: 
+    # ceil(available processors * factor). 
+    # Resulting size is then bounded by the parallelism-min 
+    # and parallelism-max values.
+    parallelism-factor = 3.0
+
+    # Min number of threads to cap parallelism-factor
+    parallelism-min = 8
+
+    # Max number of threads to cap parallelism-factor
+    parallelism-max = 64
+  }
+}
+```
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Define Custom Thread Pools
+
+```no-highlight
+contexts {
+  # DB operations
+  db-operations {
+    fork-join-executor {
+      parallelism-factor = 20.0
+    }
+  }
+  
+  # Pure asynchronous or CPU operations
+  cpu-operations {
+    fork-join-executor {
+      parallelism-factor = 1.0
+    }
+  }  
+}
+
+```
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Use Custom Thread Pools
+
+```scala
+object Contexts {
+  val dbOperations: ExecutionContext = 
+    Akka.system.dispatchers.lookup("contexts.db-operations")
+  val cpuOperations: ExecutionContext = 
+    Akka.system.dispatchers.lookup("contexts.cpu-operations")
+}
+
+// Perform DB operation on db thread pool
+implicit val ec = Contexts.dbOperations
+Future(DB.findById(id))
+```
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Switching Execution Contexts
+
+- Switching the context takes time
+- Don&#39;t overuse different Execution Contexts
+- Do performance tests when creating custom execution contexts
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown data-background="#103a51"><script type="text/template">
+## Tuning JVM Configuration
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Play JVM Characteristics
+
+- Typically a Play app doesn&#39;t use a lot of memory
+  - Minimum memory for Play is 32 MB
+  - Play application should not contain mutable state
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Specifying JVM Settings
+
+``` bash
+ activator clean stage
+ ./path/to/bin/project-name -J-Xms32m -J-Xmx32m 
+```
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## GC Logging Flags
+
+- -J-XX:+PrintGCDetails &#8594; GC logging mode
+- -J-XX:+PrintHeapAtGC &#8594; Heap occupancy before and after GC
+- -J-XX:+HeapDumpOnOutOfMemoryError &#8594; Capture heap dump before JVM crashes
+- -J-XX:+PrintTenuringDistribution &#8594;  Age distribution of all objects contained in the survivor spaces on each young generation GC
+
+[Useful JVM Flags - GC Logging](https://blog.codecentric.de/en/2014/01/useful-jvm-flags-part-8-gc-logging/)
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## GC Tuning Flags
+
+- -J-XX:+UseConcMarkSweepGC &#8594; GC in background (without stopping application)
+- -J-XX:NewSize &#8594; Default size of new GC generation
+- -J-XX:-UseAdaptiveSizePolicy &#8594; Heap is fixed (does not grow)
+- -J-XX:SurvivorRatio &#8594; Size survivor spaces
+- -J-XX:MaxGCPauseMillis &#8594; GC pause time
+- -J-XX:+DisableExplicitGC &#8594; JVM does nothing on `System.gc()` and `Runtime.gc()`
+
+[Useful JVM Flags - GC Logging](https://blog.codecentric.de/en/2014/01/useful-jvm-flags-part-8-gc-logging/)
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## GC Tuning Links
+
+- [Everything I Ever Learned About JVM Performance Tuning @Twitter](http://www.slideshare.net/aszegedi/everything-i-ever-learned-about-jvm-performance-tuning-twitter)
+- [Book: Java Performance: The Definitive Guide](http://shop.oreilly.com/product/0636920028499.do)
+- [Cubrid: How to tune Java Garbage Collection](http://www.cubrid.org/blog/dev-platform/how-to-tune-java-garbage-collection/)
+- [Pimp my GC in Scala](http://www.slideshare.net/PierreLaporte/pimp-my-gc)
+- [Useful JVM Flags Series](https://blog.codecentric.de/en/?s=useful+jvm+flags)
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown data-background="#103a51"><script type="text/template">
+## Tuning JSON
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## JSON in Play
+
+- Java
+  - Parsing Engine: [Jackson](http://jackson.codehaus.org/)
+  - JsonNode to Objects: [Jackson Data Binding](http://wiki.fasterxml.com/JacksonDataBinding) with [Annotations](https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations)
+
+- Scala
+  - Parsing Engine: [Jackson](http://jackson.codehaus.org/)
+  - JsValue to Objects: Monadic functional validation API
+
+Note:
+- Jackson Data Binding uses underlying Jackson Streaming API
+- Annotations transform JsonNode to PoJo with Reflection at Runtime
+- Monadic functional validation API produces quite a bit of garbage and is not tuned for performance
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## Benchmark Data Serializer
+
+![Benchmark Data Serializer](images/json-benchmark.png "Benchmark Data Serializer")
+</script></section>
+
+<section data-markdown><script type="text/template">
+## JSON Tuning
+
+- [Jackson Streaming API](http://wiki.fasterxml.com/JacksonStreamingApi)
+- [Jackson Afterburner](https://github.com/FasterXML/jackson-module-afterburner)
+- [Smile format](https://github.com/FasterXML/jackson-dataformat-smile)
+
+Read more on [Jackson Performance](https://github.com/FasterXML/jackson-docs/wiki/Presentation:-Jackson-Performance)
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown><script type="text/template">
+## JSON Alternatives
+
+- [ProtoBuf](https://github.com/google/protobuf)
+- [PSON](https://github.com/dcodeIO/PSON)
+- [Kyro](https://github.com/EsotericSoftware/kryo)
+- [MessagePack](http://msgpack.org/)
+</script></section>
+
+<!-- ########################################################################################### -->
+
+<section data-markdown data-background="#103a51"><script type="text/template">
+## Q & Option[A]
+</script></section>
+
+<!-- ########################################################################################### -->
+<!-- END
+<!-- ########################################################################################### -->
+
+</div>
+</div>
+
+<script src="lib/js/head.min.js"></script>
+<script src="js/reveal.js"></script>
+<script>
+
+    // Full list of configuration options available here:
+    // https://github.com/hakimel/reveal.js#configuration
+    Reveal.initialize({
+        controls: true,
+        progress: true,
+        history: true,
+        center: true,
+
+        theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+        transition: 'none', // none/fade/slide/convex/concave/zoom
+
+        // Optional reveal.js plugins
+        dependencies: [
+          { src: 'lib/js/classList.js', condition: function() { return !document.body.classList; } },
+          { src: 'plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+          { src: 'plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+          { src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+          { src: 'plugin/notes/notes.js', async: true }
+        ]
+    });
+
+</script>
+
+</body>
+</html>

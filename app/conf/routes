@@ -1,0 +1,13 @@
+# Routes
+# This file defines all application routes (Higher priority routes first)
+# ~~~~
+
+# Home page
+GET     /async               controllers.Quiz.async
+GET     /sync                controllers.Quiz.sync
+
+GET     /db                  controllers.CustomContext.db
+GET     /pi/:number          controllers.CustomContext.calcPi(number: Long)
+
+# Map static resources from the /public folder to the /assets URL path
+GET     /assets/*file               controllers.Assets.at(path="/public", file)

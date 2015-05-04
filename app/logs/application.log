@@ -1,0 +1,4 @@
+2015-05-04 13:32:09,869 [INFO] from play.api.libs.concurrent.ActorSystemProvider in pool-148-thread-5 - Starting application default Akka system: application
+2015-05-04 13:32:09,944 [INFO] from play.core.server.NettyServer$ in pool-148-thread-5 - Listening for HTTP on /0:0:0:0:0:0:0:0:9000
+2015-05-04 13:32:12,026 [INFO] from play.api.libs.concurrent.ActorSystemProvider in ForkJoinPool-4-worker-1 - Starting application default Akka system: application
+2015-05-04 13:32:12,113 [INFO] from play.api.Play$ in ForkJoinPool-4-worker-1 - Application started (Dev)
